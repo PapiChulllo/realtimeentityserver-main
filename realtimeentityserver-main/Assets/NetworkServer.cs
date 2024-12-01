@@ -1,7 +1,6 @@
 using UnityEngine;
-using UnityEngine.Assertions;
-using Unity.Collections;
 using Unity.Networking.Transport;
+using Unity.Collections;
 using System.Text;
 using System.Collections.Generic;
 
@@ -18,37 +17,34 @@ public class NetworkServer : MonoBehaviour
 
     void Start()
     {
-        if (NetworkServerProcessing.GetNetworkServer() == null)
+        NetworkServerProcessing.SetNetworkServer(this);
+        DontDestroyOnLoad(this.gameObject);
+
+        #region Bind and Listen
+
+        idToConnectionLookup = new Dictionary<int, NetworkConnection>();
+        connectionToIDLookup = new Dictionary<NetworkConnection, int>();
+
+        networkDriver = NetworkDriver.Create();
+        reliableAndInOrderPipeline = networkDriver.CreatePipeline(typeof(FragmentationPipelineStage), typeof(ReliableSequencedPipelineStage));
+        nonReliableNotInOrderedPipeline = networkDriver.CreatePipeline(typeof(FragmentationPipelineStage));
+        NetworkEndPoint endpoint = NetworkEndPoint.AnyIpv4;
+        endpoint.Port = NetworkPort;
+
+        int error = networkDriver.Bind(endpoint);
+        if (error != 0)
         {
-            NetworkServerProcessing.SetNetworkServer(this);
-            DontDestroyOnLoad(this.gameObject);
-
-            #region Connect
-
-            idToConnectionLookup = new Dictionary<int, NetworkConnection>();
-            connectionToIDLookup = new Dictionary<NetworkConnection, int>();
-
-            networkDriver = NetworkDriver.Create();
-            reliableAndInOrderPipeline = networkDriver.CreatePipeline(typeof(FragmentationPipelineStage), typeof(ReliableSequencedPipelineStage));
-            nonReliableNotInOrderedPipeline = networkDriver.CreatePipeline(typeof(FragmentationPipelineStage));
-            NetworkEndPoint endpoint = NetworkEndPoint.AnyIpv4;
-            endpoint.Port = NetworkPort;
-
-            int error = networkDriver.Bind(endpoint);
-            if (error != 0)
-                UnityEngine.Debug.Log("Failed to bind to port " + NetworkPort);
-            else
-                UnityEngine.Debug.Log("Server is listening on port " + NetworkPort);
-
-            networkConnections = new NativeList<NetworkConnection>(MaxNumberOfClientConnections, Allocator.Persistent);
-
-            #endregion
+            UnityEngine.Debug.LogError($"Failed to bind to port {NetworkPort}. Error: {error}");
         }
         else
         {
-            UnityEngine.Debug.Log("Singleton-ish architecture violation detected. Investigate where NetworkServer.cs Start() is being called.");
-            Destroy(this.gameObject);
+            networkDriver.Listen();
+            UnityEngine.Debug.Log($"Server is listening on port {NetworkPort}");
         }
+
+        networkConnections = new NativeList<NetworkConnection>(MaxNumberOfClientConnections, Allocator.Persistent);
+
+        #endregion
     }
 
     void OnDestroy()
@@ -61,8 +57,9 @@ public class NetworkServer : MonoBehaviour
     {
         networkDriver.ScheduleUpdate().Complete();
 
-        #region Remove Unused Connections
+        #region Manage Connections
 
+        // Remove stale connections
         for (int i = 0; i < networkConnections.Length; i++)
         {
             if (!networkConnections[i].IsCreated)
@@ -72,16 +69,12 @@ public class NetworkServer : MonoBehaviour
             }
         }
 
-        #endregion
-
-        #region Accept New Connections
-
-        while (AcceptIncomingConnection())
-            ;
+        // Accept new connections
+        while (AcceptIncomingConnection()) { }
 
         #endregion
 
-        #region Manage Network Events
+        #region Handle Events
 
         DataStreamReader streamReader;
         NetworkPipeline pipelineUsedToSendEvent;
@@ -89,8 +82,7 @@ public class NetworkServer : MonoBehaviour
 
         for (int i = 0; i < networkConnections.Length; i++)
         {
-            if (!networkConnections[i].IsCreated)
-                continue;
+            if (!networkConnections[i].IsCreated) continue;
 
             while (PopNetworkEventAndCheckForData(networkConnections[i], out networkEventType, out streamReader, out pipelineUsedToSendEvent))
             {
@@ -135,10 +127,7 @@ public class NetworkServer : MonoBehaviour
         networkConnections.Add(connection);
 
         int id = 0;
-        while (idToConnectionLookup.ContainsKey(id))
-        {
-            id++;
-        }
+        while (idToConnectionLookup.ContainsKey(id)) id++;
         idToConnectionLookup.Add(id, connection);
         connectionToIDLookup.Add(connection, id);
 
