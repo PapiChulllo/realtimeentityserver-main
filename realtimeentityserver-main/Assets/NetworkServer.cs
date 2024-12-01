@@ -36,9 +36,9 @@ public class NetworkServer : MonoBehaviour
 
             int error = networkDriver.Bind(endpoint);
             if (error != 0)
-                Debug.Log("Failed to bind to port " + NetworkPort);
+                UnityEngine.Debug.Log("Failed to bind to port " + NetworkPort);
             else
-                networkDriver.Listen();
+                UnityEngine.Debug.Log("Server is listening on port " + NetworkPort);
 
             networkConnections = new NativeList<NetworkConnection>(MaxNumberOfClientConnections, Allocator.Persistent);
 
@@ -46,7 +46,7 @@ public class NetworkServer : MonoBehaviour
         }
         else
         {
-            Debug.Log("Singleton-ish architecture violation detected, investigate where NetworkedServer.cs Start() is being called.  Are you creating a second instance of the NetworkedServer game object or has the NetworkedServer.cs been attached to more than one game object?");
+            UnityEngine.Debug.Log("Singleton-ish architecture violation detected. Investigate where NetworkServer.cs Start() is being called.");
             Destroy(this.gameObject);
         }
     }
@@ -159,7 +159,7 @@ public class NetworkServer : MonoBehaviour
     public void SendMessageToClient(string msg, int connectionID, TransportPipeline pipeline)
     {
         NetworkPipeline networkPipeline = reliableAndInOrderPipeline;
-        if(pipeline == TransportPipeline.FireAndForget)
+        if (pipeline == TransportPipeline.FireAndForget)
             networkPipeline = nonReliableNotInOrderedPipeline;
 
         byte[] msgAsByteArray = Encoding.Unicode.GetBytes(msg);
@@ -174,11 +174,8 @@ public class NetworkServer : MonoBehaviour
         buffer.Dispose();
     }
 
-}
-
-public enum TransportPipeline
-{
-    NotIdentified,
-    ReliableAndInOrder,
-    FireAndForget
+    public List<int> GetAllClientIDs()
+    {
+        return new List<int>(idToConnectionLookup.Keys);
+    }
 }
