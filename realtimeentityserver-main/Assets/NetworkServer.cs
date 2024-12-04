@@ -1,8 +1,15 @@
 using UnityEngine;
 using Unity.Networking.Transport;
 using Unity.Collections;
-using System.Text;
 using System.Collections.Generic;
+using System.Text;
+
+public enum TransportPipeline
+{
+    NotIdentified,
+    ReliableAndInOrder,
+    FireAndForget
+}
 
 public class NetworkServer : MonoBehaviour
 {

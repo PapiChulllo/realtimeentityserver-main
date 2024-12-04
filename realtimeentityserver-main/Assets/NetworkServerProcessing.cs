@@ -1,4 +1,16 @@
 using System.Collections.Generic;
+using UnityEngine;
+
+public enum ClientToServerSignifiers
+{
+    BalloonPopped = 1
+}
+
+public enum ServerToClientSignifiers
+{
+    SpawnBalloon = 1,
+    BalloonPopped = 2
+}
 
 static public class NetworkServerProcessing
 {
@@ -10,10 +22,10 @@ static public class NetworkServerProcessing
         string[] csv = msg.Split(',');
         int signifier = int.Parse(csv[0]);
 
-        if (signifier == ClientToServerSignifiers.BalloonPopped)
+        if (signifier == (int)ClientToServerSignifiers.BalloonPopped)
         {
-            int balloonIndex = int.Parse(csv[1]);
-            gameLogic.BalloonPopped(balloonIndex, clientConnectionID);
+            int balloonID = int.Parse(csv[1]);
+            gameLogic.BalloonPopped(balloonID, clientConnectionID);
         }
     }
 
@@ -30,6 +42,7 @@ static public class NetworkServerProcessing
     static public void ConnectionEvent(int clientConnectionID)
     {
         UnityEngine.Debug.Log("Client connected with ID: " + clientConnectionID);
+        gameLogic.SendUnpoppedBalloons(clientConnectionID);
     }
 
     static public void DisconnectionEvent(int clientConnectionID)
@@ -51,22 +64,4 @@ static public class NetworkServerProcessing
     {
         gameLogic = GameLogic;
     }
-}
-
-public enum TransportPipeline
-{
-    NotIdentified,
-    ReliableAndInOrder,
-    FireAndForget
-}
-
-static public class ClientToServerSignifiers
-{
-    public const int BalloonPopped = 1;
-}
-
-static public class ServerToClientSignifiers
-{
-    public const int SpawnBalloon = 1;
-    public const int BalloonPopped = 2;
 }
